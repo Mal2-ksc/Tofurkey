@@ -1,0 +1,660 @@
+// Tofurkey 1 by Malaclypse the Younger, mal2fnord@gmail.com. January 2021.
+// There are no samples to load. Not having any is the whole point.
+// No #include files are used, although they would make things tidier.
+// There is no separate documentation, so read the comments :) .
+// 
+// The basic setup is that there are five oscillators, labeled ❶, ❷, ❸, ❹, and ❺.
+// Each oscillator has its own set of independent parameters that operate in
+// real time, although some (like Generator) may not take effect until the next
+// keypress.
+// 
+// ∿1:Mod Depth   2:❶Generator  3:❷Generator  4:❸Generator  5:❹Generator  6:❺Generator
+// ⇌7:Out Level   8:❶Џ Bend     9:❷Џ Bend     10:❸Џ Bend    11:❹Џ Bend    12:❺Џ Bend
+// ∿13:Mod Rate   14:❶⭧ Attack  15:❷⭧ Attack  16:❸⭧ Attack  17:❹⭧ Attack  18:❺⭧ Attack  
+// ⇌19:❶Volume    20:❶⭨ Decay   21:❷⭨ Decay   22:❸⭨ Decay   23:❹⭨ Decay   24:❺⭨ Decay   
+// ⇌25:❷Volume    26:❶⭬ Sustain 27:❷⭬ Sustain 28:❸⭬ Sustain 29:❹⭬ Sustain 30:❺⭬ Sustain 
+// ⇌31:❸Volume    32:❶⭝Release 33:❷⭝Release  34:❸⭝Release 35:❹⭝Release  36:❺⭝Release 
+// ⇌37:❹Volume    38:❶Lowpass   39:❷Lowpass   40:❸Lowpass   41:❹Lowpass   42:❺Lowpass 
+// ⇌43:❺Volume    44:❶Pan/xf↹   45:❷Pan/xf↹   46:❸Pan/xf↹   47:❹Pan/xf↹   48:❺Pan/xf↹ 
+// 
+// • Volume (CC 19, 25, 31, 37, 43)            ╒═ Generators (% ≈ center):════╕
+// • Generator (CC 2-6) ───────────────────────┤ • 16' Sine (0-5) 2%          │
+// • Pitch Bend (CC 8-12)                      │ • 8' Sine (6-11) 7%          │
+// • Attack (CC 14-18)                         │ • 5¹⁄₃' Sine (12-17) 11%     │
+// • Decay (CC 20-24)                          │ • 4' Sine (18-23) 16%        │
+// • Sustain (CC 26-30)                        │ • 3¹⁄₅' Sine (24-29) 20%     │
+// • Release (CC 32-36)                        │ • 2²⁄₃' Sine (30-35) 25%     │
+// • Lowpass (CC 38-42)                        │ • 2²⁄₇' Sine (36-41) 30%     │
+// • Pan/xfade (CC 44-48)                      │ • 2' Sine (42-47) 35%        │
+//                                             │ • 16' Triangle (48-53) 39%   │
+// If the Mute (126-127) option is chosen for  │ • 8' Triangle (54-59) 44%    │
+// a Generator, the oscillator will not        │ • 5¹⁄₃' Triangle (60-65) 49% │
+// trigger, thus not consume polyphony.        │ • 4' Triangle (66-71) 54%    │
+//                                             │ • 16' Sawtooth (72-77) 58%   │
+// This is the recommended way to silence an   │ • 8' Sawtooth (78-83) 63%    │
+// oscillator unless you need it to trigger    │ • 5¹⁄₃' Sawtooth (84-89) 68% │
+// silently, perhaps so it can be faded in     │ • 4' Sawtooth (90-95) 73%    │
+// later. Volume controls are in real time.    │ • 16' Square (96-101) 77%    │
+//                                             │ • 8' Square (102-107) 82%    │
+// The lowpass filter scales based on the key  │ • 5¹⁄₃' Square (108-113) 87% │
+// pressed. It should still be pretty much     │ • 4' Square (114-119) 91%    │
+// inaudible when set at 100%, even for the    │ • Noise (120-125) 96%        │
+// lowest keys.                                │ • Mute (126-127) 100%        │
+//                                             ╘══════════════════════════════╛
+// == THE SORDID DOUBLE LIFE OF THE PAN CONTROL ==
+// If the Pan/xf↹ control is set to 0 (which can appear as 1%), that oscillator
+// will fade away with increasing velocity (a Lo-Sensitive crossfade). If the
+// Pan control is set to 127, that oscillator will fade away with decreasing
+// velocity above and beyond the effect of velocity itself (a Hi-Sensitive
+// crossfade). In either case, the definition of $XF_PAN below will determine
+// where they actually go in the sound stage.
+// 
+// Any value in between just sets the Pan position, which behaves as expected.
+// 
+// The supposition is that if you want to do crossfade effects AND stereo
+// motion, you can figure out how to extract it from two instances and a DAW.
+// 
+// How to fix an .ariax preset that throws an error:
+// 1. Use a text editor to open the .ariax file. Locate the string
+//    "C:/VST/sforzando/Tofurkey/Tofurkey 1.21.01.sfz" and change this path to
+//    match where you have the Tofurkey sfz file installed.
+// 2. Save it.
+// Once you have done this, you can drag and drop the file to an Aria window
+// which should change all the MIDI CC settings as required for a preset. It is
+// suggested to load ALL of the .ariax files into an editor that can search-and-
+// replace across all open files, such as Notepad++. Then you can fix all of the
+// presets in one go.
+//
+// To make your own presets, copy "!User Template!.ariax" and have a go at it.
+// 
+// The MIT license applies only to distribution of the Software itself, and
+// individual components that comprise it. There is ABSOLUTELY NO REQUIREMENT
+// to provide credit when merely using the instrument to make sound. You are
+// only required to provide the boilerplate license if distributing the
+// instrument itself or pieces of.
+//
+// --------------------------Begin boilerplate license--------------------------
+// MIT License 
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy 
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions: 
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software. Additionally, all 
+// alterations which are distributed are to be attributed to the person or
+// organization making them.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+// ---------------------------End boilerplate license---------------------------
+
+// Curve 0 is linear, from 0 to 1. v000=0 v127=1
+// Curve 1 is bipolar, from -1 to 1.  v000=-1 v127=1
+// Curve 2 is inverted linear, from 1 to 0. v000=1 v127=0
+// Curve 3 bipolar inverted, from 1 to -1. v000=1 v127=-1
+// Curve 4 concave (square the Curve 0 value).
+// Curve 5 is Xfin power curve (square root of Curve 0 value).
+// Curve 6 is Xfout power curve (square root of Curve 2 value).
+
+<curve> curve_index=7 // Parabolic, scales by .9295 down to v001. Good for max attack 30 seconds.
+// The right curve makes controls feel fluid but precise. Tiny attack left at v0 to soften clicks.
+// This will NOT be audible if using this as a Decay curve, it's 10 samples or something similar.
+v000=.0000005 v001=.0001 v003=.000116 v005=.000134 v007=.000155 v009=.000179 v11=.000207
+v013=.00024 v015=.000278 v017=.000322 v019=.000372 v021=.000431 v023=.000499
+v025=.000577 v027=.000668 v029=.000773 v031=.000895 v033=.00104 v035=.0012
+v037=.00139 v039=.00161 v041=.00186 v043=.00215 v045=.00249 v047=.00288 v049=.00334
+v051=.00386 v053=.00447 v055=.00518 v057=.00599 v059=.00693 v061=.00803 v063=.00929
+v065=.0108 v067=.0124 v069=.0144 v071=.0167 v073=.0193 v075=.0223 v077=.0259
+v079=.0299 v081=.0346 v083=.0401 v85=.0464 v87=.0537 v89=.0622 v91=.0719 v93=.0833
+v95=.0964 v97=.112 v99=.129 v101=.149 v103=.173 v105=.2 v107=.232 v109=.268
+v111=.31 v113=.359 v115=.416 v117=.481 v119=.557 v121=.645 v123=.747 v125=.864 v127=1
+
+<control>
+#define $MAX_AMP 60 // Maximum dB gain for Osc1/2/3/4/5 Volume. (This is self-balancing,
+                    // you should not blow up your speakers if you mess with this.)
+#define $MAX_ATK 30 // Maximum attack length, in seconds.
+#define $MAX_DEC 30 // Maximum decay length, in seconds.
+#define $MAX_SUS 30 // Maximum sustain level.
+#define $MAX_REL 10 // Maximum release length, in seconds.
+
+#define $XFIN_LO 12 // Minimum x-fade velocity for Hi-Sensitive oscillators.
+#define $XFOUT_LO 3 // Minimum x-fade velocity for Lo-Sensitive oscillators.
+#define $XFIN_HI 117 // Maximum x-fade velocity for Hi-Sensitive oscillators.
+#define $XFOUT_HI 126 // Maximum x-fade velocity for Lo-Sensitive oscillators.
+#define $XF_PAN 0 // For crossfading Pan settings: 127=full pan, 0=center it, in between blends.
+
+#define $MODDEPTH 400 // How wide (in cents) is maximum modulation? Curve 4 so 50% = 1/4 of this depth.
+#define $SINGLEBEND 200 // How wide (in cents) is per-group bending? 50%=neutral, swings both ways.
+#define $PB_RANGE 1200 // How wide (in cents) is pitch bending? Swings both ways.
+
+#define $LPFKEY_CENTER 84 // Key to center LPF scaling on (lower is brighter)
+#define $LPFKEY_TRACK 100 // Cents of scaling per key (100 = equal)
+
+// Column 1: Modulation and Mixing
+set_cc1=0 label_cc1=∿1:Mod Depth ₀        // Normally at 0. Max Mod Depth defined above.❶
+set_cc7=80 label_cc7=⇌7:Main Vol ₆₃       // Main Volume❶
+set_cc13=63 label_cc13=∿13:Mod Rate ₅₀     // Mod rate, sqrt(x). 0 = 0.01 Hz, 127 = 21.99 Hz.❶
+set_cc19=63 label_cc19=⇌19:❶Volume ₅₀
+set_cc25=63 label_cc25=⇌25:❷Volume ₅₀
+set_cc31=25 label_cc31=⇌31:❸Volume ₅₀
+set_cc37=63 label_cc37=⇌37:❹Volume ₅₀
+set_cc43=13 label_cc43=⇌43:❺Volume ₅₀
+
+// Column 2: Oscillator 1 -- 8' Sine
+set_cc2=9 label_cc2=2:❶Generator
+set_cc8=63 label_cc8=8:❶Џ Bend ₅₀
+set_cc14=2 label_cc14=14:❶⭧ Attack
+set_cc20=127 label_cc20=20:❶⭨ Decay
+set_cc26=127 label_cc26=26:❶⭬  Sustain
+set_cc32=13 label_cc32=32:❶⭝ Release
+set_cc38=63 label_cc38=38:❶Lowpass ₅₀
+set_cc44=63 label_cc44=44:❶Pan/xf↹ ₅₀
+
+// Column 3: Oscillator 2 -- Muted
+set_cc3=127 label_cc3=3:❷Generator
+set_cc9=63 label_cc9=9:❷Џ Bend ₅₀
+set_cc15=2 label_cc15=15:❷⭧ Attack
+set_cc21=127 label_cc21=21:❷⭨ Decay
+set_cc27=127 label_cc27=27:❷⭬  Sustain
+set_cc33=13 label_cc33=33:❷⭝ Release
+set_cc39=63 label_cc39=39:❷Lowpass ₅₀
+set_cc45=63 label_cc45=45:❷Pan/xf↹ ₅₀
+
+// Column 4: Oscillator 3 -- Muted
+set_cc4=127 label_cc4=4:❸Generator
+set_cc10=63 label_cc10=10:❸Џ Bend ₅₀
+set_cc16=2 label_cc16=16:❸⭧ Attack
+set_cc22=127 label_cc22=22:❸⭨ Decay
+set_cc28=127 label_cc28=28:❸⭬  Sustain
+set_cc34=13 label_cc34=34:❸⭝ Release
+set_cc40=63 label_cc40=40:❸Lowpass ₅₀ 
+set_cc46=63 label_cc46=46:❸Pan/xf↹ ₅₀
+
+// Column 5: Oscillator 4 -- Muted
+set_cc5=127 label_cc5=5:❹Generator
+set_cc11=63 label_cc11=11:❹Џ Bend ₅₀
+set_cc17=2 label_cc17=17:❹⭧ Attack
+set_cc23=127 label_cc23=23:❹⭨ Decay
+set_cc29=127 label_cc29=29:❹⭬  Sustain
+set_cc35=13 label_cc35=35:❹⭝ Release
+set_cc41=63 label_cc41=41:❹Lowpass ₅₀ 
+set_cc47=63 label_cc47=47:❹Pan/xf↹ ₅₀
+
+// Column 6: Oscillator 5 -- Key noise
+set_cc6=122 label_cc6=6:❺Generator ₉₆
+set_cc12=63 label_cc12=12:❺Џ Bend ₅₀
+set_cc18=2 label_cc18=18:❺⭧ Attack
+set_cc24=20 label_cc24=24:❺⭨ Decay
+set_cc30=0 label_cc30=30:❺⭬  Sustain
+set_cc36=0 label_cc36=36:❺⭝ Release
+set_cc42=63 label_cc42=42:❺Lowpass ₅₀
+set_cc48=63 label_cc48=48:❺Pan/xf↹ ₅₀
+
+<global>
+xf_keycurve=power amp_veltrack=100 pitch_keycenter=60 ampeg_decay_shape=0 ampeg_decay_zero=0
+ampeg_sustain=0 // This is necessary to make the Sustain controls work.
+lfo01_pitch_curvecc1=4 // Curve of modulation depth is x² so 50% = 1/4 scale.
+lfo01_freq_curvecc13=4 lfo01_freq=0.01 lfo01_freq_oncc13=21.99 // Modulation rate. 0 = 0.01 Hz, 127 = 21.99 Hz, 50% = 5.5 Hz because of sqrt(x) curve 4
+lfo01_pitch_oncc1=$MODDEPTH // Modulation depth. Range set by #define above.
+// CC7 is doing its default job, but specifying avoids glitchiness.
+// The various "presets" will put their names above CC7's slot but it still controls volume.
+amplitude_oncc7=100 amplitude_curvecc7=4
+// Override the use of CC10 to perform global panning, so it can be re-used.
+pan_oncc10=0 pan=0
+// Octave bend range for primary Pitch Bend, both directions.
+bend_up=$PB_RANGE bend_down=-$PB_RANGE
+// Use center-neutral linear for pitch bends
+pitch_curvecc8=1 pitch_curvecc9=1 pitch_curvecc10=1 pitch_curvecc11=1 pitch_curvecc12=1
+// Use xfin curve for Osc Volume controls
+volume_curvecc19=5 volume_curvecc25=5 volume_curvecc31=5
+volume_curvecc37=5 volume_curvecc43=5
+// Use fine curve for Attack controls
+ampeg_attack_curvecc14=7 ampeg_attack_curvecc15=7 ampeg_attack_curvecc16=7
+ampeg_attack_curvecc17=7 ampeg_attack_curvecc18=7
+// Use fine curve for Decay controls
+ampeg_decay_curvecc20=7 ampeg_decay_curvecc21=7 ampeg_decay_curvecc22=7
+ampeg_decay_curvecc23=7 ampeg_decay_curvecc24=7
+// Use square root curve for Sustain controls
+ampeg_sustain_curvecc26=4 ampeg_sustain_curvecc27=4 ampeg_sustain_curvecc28=4
+ampeg_sustain_curvecc29=4 ampeg_sustain_curvecc30=4
+// Use square root curve for Release controls
+ampeg_release_curvecc32=4 ampeg_release_curvecc33=4 ampeg_release_curvecc34=4
+ampeg_release_curvecc35=4 ampeg_release_curvecc36=4
+// Use center-neutral linear for pan controls
+pan_curvecc44=1 pan_curvecc45=1 pan_curvecc46=1 pan_curvecc47=1 pan_curvecc48=1
+// The entire keyboard is for notes.
+lokey=0 hikey=127
+
+// Oscillator 1 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+<master> hicc44=0 xfout_lovel=$XFOUT_LO xfout_hivel=$XFOUT_HI pan_cc44=$XF_PAN // Lo-sensitive crossfade
+// Oscillator 1 core
+volume=-$MAX_AMP volume_cc19=$MAX_AMP
+ampeg_attackcc14=$MAX_ATK ampeg_decaycc20=$MAX_DEC ampeg_sustaincc26=$MAX_SUS ampeg_releasecc32=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc38=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc2=0 hicc2=5 sample=*sine tune=-1200 pitch_cc8=$SINGLEBEND // 16' Sine
+<region> locc2=6 hicc2=11 sample=*sine pitch_cc8=$SINGLEBEND // 8' Sine
+<region> locc2=12 hicc2=17 sample=*sine tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc2=18 hicc2=23 sample=*sine tune=1200 pitch_cc8=$SINGLEBEND // 4' Sine
+<region> locc2=24 hicc2=29 sample=*sine tune=1586 pitch_cc8=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc2=30 hicc2=35 sample=*sine tune=1901.6 pitch_cc8=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc2=36 hicc2=41 sample=*sine tune=2159 pitch_cc8=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc2=72 hicc2=75 sample=*sine tune=2400 pitch_cc8=$SINGLEBEND // 2' Sine
+<region> locc2=48 hicc2=53 sample=*tri tune=-1200 pitch_cc8=$SINGLEBEND // 16' Triangle
+<region> locc2=54 hicc2=59 sample=*tri pitch_cc8=$SINGLEBEND // 8' Triangle
+<region> locc2=60 hicc2=65 sample=*tri tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc2=66 hicc2=71 sample=*tri tune=1200 pitch_cc8=$SINGLEBEND // 4' Triangle
+<region> locc2=72 hicc2=77 sample=*saw tune=-1200 pitch_cc8=$SINGLEBEND // 16' Sawtooth
+<region> locc2=78 hicc2=83 sample=*saw pitch_cc8=$SINGLEBEND // 8' Sawtooth
+<region> locc2=84 hicc2=89 sample=*saw tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc2=90 hicc2=95 sample=*saw tune=1200 pitch_cc8=$SINGLEBEND // 4' Sawtooth
+<region> locc2=96 hicc2=101 sample=*square tune=-1200 pitch_cc8=$SINGLEBEND // 16' Square
+<region> locc2=102 hicc2=107 sample=*square pitch_cc8=$SINGLEBEND // 8' Square
+<region> locc2=108 hicc2=113 sample=*square tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc2=114 hicc2=119 sample=*square tune=1200 pitch_cc8=$SINGLEBEND // 4' Square
+<region> locc2=120 hicc2=125 sample=*noise // Noise
+
+<master> locc44=1 hicc44=126 pan_cc44=100 // No crossfade
+// Oscillator 1 core
+volume=-$MAX_AMP volume_cc19=$MAX_AMP
+ampeg_attackcc14=$MAX_ATK ampeg_decaycc20=$MAX_DEC ampeg_sustaincc26=$MAX_SUS ampeg_releasecc32=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc38=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc2=0 hicc2=5 sample=*sine tune=-1200 pitch_cc8=$SINGLEBEND // 16' Sine
+<region> locc2=6 hicc2=11 sample=*sine pitch_cc8=$SINGLEBEND // 8' Sine
+<region> locc2=12 hicc2=17 sample=*sine tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc2=18 hicc2=23 sample=*sine tune=1200 pitch_cc8=$SINGLEBEND // 4' Sine
+<region> locc2=24 hicc2=29 sample=*sine tune=1586 pitch_cc8=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc2=30 hicc2=35 sample=*sine tune=1901.6 pitch_cc8=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc2=36 hicc2=41 sample=*sine tune=2159 pitch_cc8=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc2=72 hicc2=75 sample=*sine tune=2400 pitch_cc8=$SINGLEBEND // 2' Sine
+<region> locc2=48 hicc2=53 sample=*tri tune=-1200 pitch_cc8=$SINGLEBEND // 16' Triangle
+<region> locc2=54 hicc2=59 sample=*tri pitch_cc8=$SINGLEBEND // 8' Triangle
+<region> locc2=60 hicc2=65 sample=*tri tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc2=66 hicc2=71 sample=*tri tune=1200 pitch_cc8=$SINGLEBEND // 4' Triangle
+<region> locc2=72 hicc2=77 sample=*saw tune=-1200 pitch_cc8=$SINGLEBEND // 16' Sawtooth
+<region> locc2=78 hicc2=83 sample=*saw pitch_cc8=$SINGLEBEND // 8' Sawtooth
+<region> locc2=84 hicc2=89 sample=*saw tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc2=90 hicc2=95 sample=*saw tune=1200 pitch_cc8=$SINGLEBEND // 4' Sawtooth
+<region> locc2=96 hicc2=101 sample=*square tune=-1200 pitch_cc8=$SINGLEBEND // 16' Square
+<region> locc2=102 hicc2=107 sample=*square pitch_cc8=$SINGLEBEND // 8' Square
+<region> locc2=108 hicc2=113 sample=*square tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc2=114 hicc2=119 sample=*square tune=1200 pitch_cc8=$SINGLEBEND // 4' Square
+<region> locc2=120 hicc2=125 sample=*noise // Noise
+
+<master> locc44=127 xfin_lovel=$XFIN_LO xfin_hivel=$XFIN_HI pan_cc44=$XF_PAN // Hi-sensitive crossfade
+// Oscillator 1 core
+volume=-$MAX_AMP volume_cc19=$MAX_AMP
+ampeg_attackcc14=$MAX_ATK ampeg_decaycc20=$MAX_DEC ampeg_sustaincc26=$MAX_SUS ampeg_releasecc32=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc38=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc2=0 hicc2=5 sample=*sine tune=-1200 pitch_cc8=$SINGLEBEND // 16' Sine
+<region> locc2=6 hicc2=11 sample=*sine pitch_cc8=$SINGLEBEND // 8' Sine
+<region> locc2=12 hicc2=17 sample=*sine tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc2=18 hicc2=23 sample=*sine tune=1200 pitch_cc8=$SINGLEBEND // 4' Sine
+<region> locc2=24 hicc2=29 sample=*sine tune=1586 pitch_cc8=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc2=30 hicc2=35 sample=*sine tune=1901.6 pitch_cc8=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc2=36 hicc2=41 sample=*sine tune=2159 pitch_cc8=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc2=72 hicc2=75 sample=*sine tune=2400 pitch_cc8=$SINGLEBEND // 2' Sine
+<region> locc2=48 hicc2=53 sample=*tri tune=-1200 pitch_cc8=$SINGLEBEND // 16' Triangle
+<region> locc2=54 hicc2=59 sample=*tri pitch_cc8=$SINGLEBEND // 8' Triangle
+<region> locc2=60 hicc2=65 sample=*tri tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc2=66 hicc2=71 sample=*tri tune=1200 pitch_cc8=$SINGLEBEND // 4' Triangle
+<region> locc2=72 hicc2=77 sample=*saw tune=-1200 pitch_cc8=$SINGLEBEND // 16' Sawtooth
+<region> locc2=78 hicc2=83 sample=*saw pitch_cc8=$SINGLEBEND // 8' Sawtooth
+<region> locc2=84 hicc2=89 sample=*saw tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc2=90 hicc2=95 sample=*saw tune=1200 pitch_cc8=$SINGLEBEND // 4' Sawtooth
+<region> locc2=96 hicc2=101 sample=*square tune=-1200 pitch_cc8=$SINGLEBEND // 16' Square
+<region> locc2=102 hicc2=107 sample=*square pitch_cc8=$SINGLEBEND // 8' Square
+<region> locc2=108 hicc2=113 sample=*square tune=701.6 pitch_cc8=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc2=114 hicc2=119 sample=*square tune=1200 pitch_cc8=$SINGLEBEND // 4' Square
+<region> locc2=120 hicc2=125 sample=*noise // Noise
+
+// Oscillator 2 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+<master> hicc45=0 xfout_lovel=$XFOUT_LO xfout_hivel=$XFOUT_HI pan_cc45=$XF_PAN // Lo-sensitive crossfade
+// Oscillator 2 core
+volume=-$MAX_AMP volume_cc25=$MAX_AMP
+ampeg_attackcc15=$MAX_ATK ampeg_decaycc21=$MAX_DEC ampeg_sustaincc27=$MAX_SUS ampeg_releasecc33=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc39=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc3=0 hicc3=5 sample=*sine tune=-1200 pitch_cc9=$SINGLEBEND // 16' Sine
+<region> locc3=6 hicc3=11 sample=*sine pitch_cc9=$SINGLEBEND // 8' Sine
+<region> locc3=12 hicc3=17 sample=*sine tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc3=18 hicc3=23 sample=*sine tune=1200 pitch_cc9=$SINGLEBEND // 4' Sine
+<region> locc3=24 hicc3=29 sample=*sine tune=1586 pitch_cc9=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc3=30 hicc3=35 sample=*sine tune=1901.6 pitch_cc9=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc3=36 hicc3=41 sample=*sine tune=2159 pitch_cc9=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc3=72 hicc3=75 sample=*sine tune=2400 pitch_cc9=$SINGLEBEND // 2' Sine
+<region> locc3=48 hicc3=53 sample=*tri tune=-1200 pitch_cc9=$SINGLEBEND // 16' Triangle
+<region> locc3=54 hicc3=59 sample=*tri pitch_cc9=$SINGLEBEND // 8' Triangle
+<region> locc3=60 hicc3=65 sample=*tri tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc3=66 hicc3=71 sample=*tri tune=1200 pitch_cc9=$SINGLEBEND // 4' Triangle
+<region> locc3=72 hicc3=77 sample=*saw tune=-1200 pitch_cc9=$SINGLEBEND // 16' Sawtooth
+<region> locc3=78 hicc3=83 sample=*saw pitch_cc9=$SINGLEBEND // 8' Sawtooth
+<region> locc3=84 hicc3=89 sample=*saw tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc3=90 hicc3=95 sample=*saw tune=1200 pitch_cc9=$SINGLEBEND // 4' Sawtooth
+<region> locc3=96 hicc3=101 sample=*square tune=-1200 pitch_cc9=$SINGLEBEND // 16' Square
+<region> locc3=102 hicc3=107 sample=*square pitch_cc9=$SINGLEBEND // 8' Square
+<region> locc3=108 hicc3=113 sample=*square tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc3=114 hicc3=119 sample=*square tune=1200 pitch_cc9=$SINGLEBEND // 4' Square
+<region> locc3=120 hicc3=125 sample=*noise // Noise
+
+<master> locc45=1 hicc45=126 pan_cc45=100 // No crossfade
+// Oscillator 2 core
+volume=-$MAX_AMP volume_cc25=$MAX_AMP
+ampeg_attackcc15=$MAX_ATK ampeg_decaycc21=$MAX_DEC ampeg_sustaincc27=$MAX_SUS ampeg_releasecc33=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc39=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc3=0 hicc3=5 sample=*sine tune=-1200 pitch_cc9=$SINGLEBEND // 16' Sine
+<region> locc3=6 hicc3=11 sample=*sine pitch_cc9=$SINGLEBEND // 8' Sine
+<region> locc3=12 hicc3=17 sample=*sine tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc3=18 hicc3=23 sample=*sine tune=1200 pitch_cc9=$SINGLEBEND // 4' Sine
+<region> locc3=24 hicc3=29 sample=*sine tune=1586 pitch_cc9=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc3=30 hicc3=35 sample=*sine tune=1901.6 pitch_cc9=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc3=36 hicc3=41 sample=*sine tune=2159 pitch_cc9=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc3=72 hicc3=75 sample=*sine tune=2400 pitch_cc9=$SINGLEBEND // 2' Sine
+<region> locc3=48 hicc3=53 sample=*tri tune=-1200 pitch_cc9=$SINGLEBEND // 16' Triangle
+<region> locc3=54 hicc3=59 sample=*tri pitch_cc9=$SINGLEBEND // 8' Triangle
+<region> locc3=60 hicc3=65 sample=*tri tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc3=66 hicc3=71 sample=*tri tune=1200 pitch_cc9=$SINGLEBEND // 4' Triangle
+<region> locc3=72 hicc3=77 sample=*saw tune=-1200 pitch_cc9=$SINGLEBEND // 16' Sawtooth
+<region> locc3=78 hicc3=83 sample=*saw pitch_cc9=$SINGLEBEND // 8' Sawtooth
+<region> locc3=84 hicc3=89 sample=*saw tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc3=90 hicc3=95 sample=*saw tune=1200 pitch_cc9=$SINGLEBEND // 4' Sawtooth
+<region> locc3=96 hicc3=101 sample=*square tune=-1200 pitch_cc9=$SINGLEBEND // 16' Square
+<region> locc3=102 hicc3=107 sample=*square pitch_cc9=$SINGLEBEND // 8' Square
+<region> locc3=108 hicc3=113 sample=*square tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc3=114 hicc3=119 sample=*square tune=1200 pitch_cc9=$SINGLEBEND // 4' Square
+<region> locc3=120 hicc3=125 sample=*noise // Noise
+
+<master> locc45=127 xfin_lovel=$XFIN_LO xfin_hivel=$XFIN_HI pan_cc45=$XF_PAN // Hi-sensitive crossfade
+// Oscillator 2 core
+volume=-$MAX_AMP volume_cc25=$MAX_AMP
+ampeg_attackcc15=$MAX_ATK ampeg_decaycc21=$MAX_DEC ampeg_sustaincc27=$MAX_SUS ampeg_releasecc33=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc39=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc3=0 hicc3=5 sample=*sine tune=-1200 pitch_cc9=$SINGLEBEND // 16' Sine
+<region> locc3=6 hicc3=11 sample=*sine pitch_cc9=$SINGLEBEND // 8' Sine
+<region> locc3=12 hicc3=17 sample=*sine tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc3=18 hicc3=23 sample=*sine tune=1200 pitch_cc9=$SINGLEBEND // 4' Sine
+<region> locc3=24 hicc3=29 sample=*sine tune=1586 pitch_cc9=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc3=30 hicc3=35 sample=*sine tune=1901.6 pitch_cc9=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc3=36 hicc3=41 sample=*sine tune=2159 pitch_cc9=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc3=72 hicc3=75 sample=*sine tune=2400 pitch_cc9=$SINGLEBEND // 2' Sine
+<region> locc3=48 hicc3=53 sample=*tri tune=-1200 pitch_cc9=$SINGLEBEND // 16' Triangle
+<region> locc3=54 hicc3=59 sample=*tri pitch_cc9=$SINGLEBEND // 8' Triangle
+<region> locc3=60 hicc3=65 sample=*tri tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc3=66 hicc3=71 sample=*tri tune=1200 pitch_cc9=$SINGLEBEND // 4' Triangle
+<region> locc3=72 hicc3=77 sample=*saw tune=-1200 pitch_cc9=$SINGLEBEND // 16' Sawtooth
+<region> locc3=78 hicc3=83 sample=*saw pitch_cc9=$SINGLEBEND // 8' Sawtooth
+<region> locc3=84 hicc3=89 sample=*saw tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc3=90 hicc3=95 sample=*saw tune=1200 pitch_cc9=$SINGLEBEND // 4' Sawtooth
+<region> locc3=96 hicc3=101 sample=*square tune=-1200 pitch_cc9=$SINGLEBEND // 16' Square
+<region> locc3=102 hicc3=107 sample=*square pitch_cc9=$SINGLEBEND // 8' Square
+<region> locc3=108 hicc3=113 sample=*square tune=701.6 pitch_cc9=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc3=114 hicc3=119 sample=*square tune=1200 pitch_cc9=$SINGLEBEND // 4' Square
+<region> locc3=120 hicc3=125 sample=*noise // Noise
+
+// Oscillator 3 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+<master> hicc46=0 xfout_lovel=$XFOUT_LO xfout_hivel=$XFOUT_HI pan_cc46=$XF_PAN // Lo-sensitive crossfade
+// Oscillator 3 core
+volume=-$MAX_AMP volume_cc31=$MAX_AMP
+ampeg_attackcc16=$MAX_ATK ampeg_decaycc22=$MAX_DEC ampeg_sustaincc28=$MAX_SUS ampeg_releasecc34=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc40=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc4=0 hicc4=5 sample=*sine tune=-1200 pitch_cc10=$SINGLEBEND // 16' Sine
+<region> locc4=6 hicc4=11 sample=*sine pitch_cc10=$SINGLEBEND // 8' Sine
+<region> locc4=12 hicc4=17 sample=*sine tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc4=18 hicc4=23 sample=*sine tune=1200 pitch_cc10=$SINGLEBEND // 4' Sine
+<region> locc4=24 hicc4=29 sample=*sine tune=1586 pitch_cc10=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc4=30 hicc4=35 sample=*sine tune=1901.6 pitch_cc10=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc4=36 hicc4=41 sample=*sine tune=2159 pitch_cc10=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc4=72 hicc4=75 sample=*sine tune=2400 pitch_cc10=$SINGLEBEND // 2' Sine
+<region> locc4=48 hicc4=53 sample=*tri tune=-1200 pitch_cc10=$SINGLEBEND // 16' Triangle
+<region> locc4=54 hicc4=59 sample=*tri pitch_cc10=$SINGLEBEND // 8' Triangle
+<region> locc4=60 hicc4=65 sample=*tri tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc4=66 hicc4=71 sample=*tri tune=1200 pitch_cc10=$SINGLEBEND // 4' Triangle
+<region> locc4=72 hicc4=77 sample=*saw tune=-1200 pitch_cc10=$SINGLEBEND // 16' Sawtooth
+<region> locc4=78 hicc4=83 sample=*saw pitch_cc10=$SINGLEBEND // 8' Sawtooth
+<region> locc4=84 hicc4=89 sample=*saw tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc4=90 hicc4=95 sample=*saw tune=1200 pitch_cc10=$SINGLEBEND // 4' Sawtooth
+<region> locc4=96 hicc4=101 sample=*square tune=-1200 pitch_cc10=$SINGLEBEND // 16' Square
+<region> locc4=102 hicc4=107 sample=*square pitch_cc10=$SINGLEBEND // 8' Square
+<region> locc4=108 hicc4=113 sample=*square tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc4=114 hicc4=119 sample=*square tune=1200 pitch_cc10=$SINGLEBEND // 4' Square
+<region> locc4=120 hicc4=125 sample=*noise // Noise
+
+<master> locc46=1 hicc46=126 pan_cc46=100 // No crossfade
+// Oscillator 3 core
+volume=-$MAX_AMP volume_cc31=$MAX_AMP
+ampeg_attackcc16=$MAX_ATK ampeg_decaycc22=$MAX_DEC ampeg_sustaincc28=$MAX_SUS ampeg_releasecc34=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc40=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc4=0 hicc4=5 sample=*sine tune=-1200 pitch_cc10=$SINGLEBEND // 16' Sine
+<region> locc4=6 hicc4=11 sample=*sine pitch_cc10=$SINGLEBEND // 8' Sine
+<region> locc4=12 hicc4=17 sample=*sine tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc4=18 hicc4=23 sample=*sine tune=1200 pitch_cc10=$SINGLEBEND // 4' Sine
+<region> locc4=24 hicc4=29 sample=*sine tune=1586 pitch_cc10=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc4=30 hicc4=35 sample=*sine tune=1901.6 pitch_cc10=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc4=36 hicc4=41 sample=*sine tune=2159 pitch_cc10=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc4=72 hicc4=75 sample=*sine tune=2400 pitch_cc10=$SINGLEBEND // 2' Sine
+<region> locc4=48 hicc4=53 sample=*tri tune=-1200 pitch_cc10=$SINGLEBEND // 16' Triangle
+<region> locc4=54 hicc4=59 sample=*tri pitch_cc10=$SINGLEBEND // 8' Triangle
+<region> locc4=60 hicc4=65 sample=*tri tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc4=66 hicc4=71 sample=*tri tune=1200 pitch_cc10=$SINGLEBEND // 4' Triangle
+<region> locc4=72 hicc4=77 sample=*saw tune=-1200 pitch_cc10=$SINGLEBEND // 16' Sawtooth
+<region> locc4=78 hicc4=83 sample=*saw pitch_cc10=$SINGLEBEND // 8' Sawtooth
+<region> locc4=84 hicc4=89 sample=*saw tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc4=90 hicc4=95 sample=*saw tune=1200 pitch_cc10=$SINGLEBEND // 4' Sawtooth
+<region> locc4=96 hicc4=101 sample=*square tune=-1200 pitch_cc10=$SINGLEBEND // 16' Square
+<region> locc4=102 hicc4=107 sample=*square pitch_cc10=$SINGLEBEND // 8' Square
+<region> locc4=108 hicc4=113 sample=*square tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc4=114 hicc4=119 sample=*square tune=1200 pitch_cc10=$SINGLEBEND // 4' Square
+<region> locc4=120 hicc4=125 sample=*noise // Noise
+
+<master> locc46=127 xfin_lovel=$XFIN_LO xfin_hivel=$XFIN_HI pan_cc46=$XF_PAN // Hi-sensitive crossfade
+// Oscillator 3 core
+volume=-$MAX_AMP volume_cc31=$MAX_AMP
+ampeg_attackcc16=$MAX_ATK ampeg_decaycc22=$MAX_DEC ampeg_sustaincc28=$MAX_SUS ampeg_releasecc34=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc40=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc4=0 hicc4=5 sample=*sine tune=-1200 pitch_cc10=$SINGLEBEND // 16' Sine
+<region> locc4=6 hicc4=11 sample=*sine pitch_cc10=$SINGLEBEND // 8' Sine
+<region> locc4=12 hicc4=17 sample=*sine tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc4=18 hicc4=23 sample=*sine tune=1200 pitch_cc10=$SINGLEBEND // 4' Sine
+<region> locc4=24 hicc4=29 sample=*sine tune=1586 pitch_cc10=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc4=30 hicc4=35 sample=*sine tune=1901.6 pitch_cc10=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc4=36 hicc4=41 sample=*sine tune=2159 pitch_cc10=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc4=72 hicc4=75 sample=*sine tune=2400 pitch_cc10=$SINGLEBEND // 2' Sine
+<region> locc4=48 hicc4=53 sample=*tri tune=-1200 pitch_cc10=$SINGLEBEND // 16' Triangle
+<region> locc4=54 hicc4=59 sample=*tri pitch_cc10=$SINGLEBEND // 8' Triangle
+<region> locc4=60 hicc4=65 sample=*tri tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc4=66 hicc4=71 sample=*tri tune=1200 pitch_cc10=$SINGLEBEND // 4' Triangle
+<region> locc4=72 hicc4=77 sample=*saw tune=-1200 pitch_cc10=$SINGLEBEND // 16' Sawtooth
+<region> locc4=78 hicc4=83 sample=*saw pitch_cc10=$SINGLEBEND // 8' Sawtooth
+<region> locc4=84 hicc4=89 sample=*saw tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc4=90 hicc4=95 sample=*saw tune=1200 pitch_cc10=$SINGLEBEND // 4' Sawtooth
+<region> locc4=96 hicc4=101 sample=*square tune=-1200 pitch_cc10=$SINGLEBEND // 16' Square
+<region> locc4=102 hicc4=107 sample=*square pitch_cc10=$SINGLEBEND // 8' Square
+<region> locc4=108 hicc4=113 sample=*square tune=701.6 pitch_cc10=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc4=114 hicc4=119 sample=*square tune=1200 pitch_cc10=$SINGLEBEND // 4' Square
+<region> locc4=120 hicc4=125 sample=*noise // Noise
+
+// Oscillator 4 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+<master> hicc47=0 xfout_lovel=$XFOUT_LO xfout_hivel=$XFOUT_HI pan_cc47=$XF_PAN // Lo-sensitive crossfade
+// Oscillator 4 core
+volume=-$MAX_AMP volume_cc37=$MAX_AMP
+ampeg_attackcc17=$MAX_ATK ampeg_decaycc23=$MAX_DEC ampeg_sustaincc29=$MAX_SUS ampeg_releasecc35=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc41=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc5=0 hicc5=5 sample=*sine tune=-1200 pitch_cc11=$SINGLEBEND // 16' Sine
+<region> locc5=6 hicc5=11 sample=*sine pitch_cc11=$SINGLEBEND // 8' Sine
+<region> locc5=12 hicc5=17 sample=*sine tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc5=18 hicc5=23 sample=*sine tune=1200 pitch_cc11=$SINGLEBEND // 4' Sine
+<region> locc5=24 hicc5=29 sample=*sine tune=1586 pitch_cc11=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc5=30 hicc5=35 sample=*sine tune=1901.6 pitch_cc11=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc5=36 hicc5=41 sample=*sine tune=2159 pitch_cc11=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc5=72 hicc5=75 sample=*sine tune=2400 pitch_cc11=$SINGLEBEND // 2' Sine
+<region> locc5=48 hicc5=53 sample=*tri tune=-1200 pitch_cc11=$SINGLEBEND // 16' Triangle
+<region> locc5=54 hicc5=59 sample=*tri pitch_cc11=$SINGLEBEND // 8' Triangle
+<region> locc5=60 hicc5=65 sample=*tri tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc5=66 hicc5=71 sample=*tri tune=1200 pitch_cc11=$SINGLEBEND // 4' Triangle
+<region> locc5=72 hicc5=77 sample=*saw tune=-1200 pitch_cc11=$SINGLEBEND // 16' Sawtooth
+<region> locc5=78 hicc5=83 sample=*saw pitch_cc11=$SINGLEBEND // 8' Sawtooth
+<region> locc5=84 hicc5=89 sample=*saw tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc5=90 hicc5=95 sample=*saw tune=1200 pitch_cc11=$SINGLEBEND // 4' Sawtooth
+<region> locc5=96 hicc5=101 sample=*square tune=-1200 pitch_cc11=$SINGLEBEND // 16' Square
+<region> locc5=102 hicc5=107 sample=*square pitch_cc11=$SINGLEBEND // 8' Square
+<region> locc5=108 hicc5=113 sample=*square tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc5=114 hicc5=119 sample=*square tune=1200 pitch_cc11=$SINGLEBEND // 4' Square
+<region> locc5=120 hicc5=125 sample=*noise // Noise
+
+<master> locc47=1 hicc47=126 pan_cc47=100 // No crossfade
+// Oscillator 4 core
+volume=-$MAX_AMP volume_cc37=$MAX_AMP
+ampeg_attackcc17=$MAX_ATK ampeg_decaycc23=$MAX_DEC ampeg_sustaincc29=$MAX_SUS ampeg_releasecc35=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc41=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc5=0 hicc5=5 sample=*sine tune=-1200 pitch_cc11=$SINGLEBEND // 16' Sine
+<region> locc5=6 hicc5=11 sample=*sine pitch_cc11=$SINGLEBEND // 8' Sine
+<region> locc5=12 hicc5=17 sample=*sine tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc5=18 hicc5=23 sample=*sine tune=1200 pitch_cc11=$SINGLEBEND // 4' Sine
+<region> locc5=24 hicc5=29 sample=*sine tune=1586 pitch_cc11=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc5=30 hicc5=35 sample=*sine tune=1901.6 pitch_cc11=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc5=36 hicc5=41 sample=*sine tune=2159 pitch_cc11=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc5=72 hicc5=75 sample=*sine tune=2400 pitch_cc11=$SINGLEBEND // 2' Sine
+<region> locc5=48 hicc5=53 sample=*tri tune=-1200 pitch_cc11=$SINGLEBEND // 16' Triangle
+<region> locc5=54 hicc5=59 sample=*tri pitch_cc11=$SINGLEBEND // 8' Triangle
+<region> locc5=60 hicc5=65 sample=*tri tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc5=66 hicc5=71 sample=*tri tune=1200 pitch_cc11=$SINGLEBEND // 4' Triangle
+<region> locc5=72 hicc5=77 sample=*saw tune=-1200 pitch_cc11=$SINGLEBEND // 16' Sawtooth
+<region> locc5=78 hicc5=83 sample=*saw pitch_cc11=$SINGLEBEND // 8' Sawtooth
+<region> locc5=84 hicc5=89 sample=*saw tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc5=90 hicc5=95 sample=*saw tune=1200 pitch_cc11=$SINGLEBEND // 4' Sawtooth
+<region> locc5=96 hicc5=101 sample=*square tune=-1200 pitch_cc11=$SINGLEBEND // 16' Square
+<region> locc5=102 hicc5=107 sample=*square pitch_cc11=$SINGLEBEND // 8' Square
+<region> locc5=108 hicc5=113 sample=*square tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc5=114 hicc5=119 sample=*square tune=1200 pitch_cc11=$SINGLEBEND // 4' Square
+<region> locc5=120 hicc5=125 sample=*noise // Noise
+
+<master> locc47=127 xfin_lovel=$XFIN_LO xfin_hivel=$XFIN_HI pan_cc47=$XF_PAN // Hi-sensitive crossfade
+// Oscillator 4 core
+volume=-$MAX_AMP volume_cc37=$MAX_AMP
+ampeg_attackcc17=$MAX_ATK ampeg_decaycc23=$MAX_DEC ampeg_sustaincc29=$MAX_SUS ampeg_releasecc35=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc41=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc5=0 hicc5=5 sample=*sine tune=-1200 pitch_cc11=$SINGLEBEND // 16' Sine
+<region> locc5=6 hicc5=11 sample=*sine pitch_cc11=$SINGLEBEND // 8' Sine
+<region> locc5=12 hicc5=17 sample=*sine tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc5=18 hicc5=23 sample=*sine tune=1200 pitch_cc11=$SINGLEBEND // 4' Sine
+<region> locc5=24 hicc5=29 sample=*sine tune=1586 pitch_cc11=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc5=30 hicc5=35 sample=*sine tune=1901.6 pitch_cc11=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc5=36 hicc5=41 sample=*sine tune=2159 pitch_cc11=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc5=72 hicc5=75 sample=*sine tune=2400 pitch_cc11=$SINGLEBEND // 2' Sine
+<region> locc5=48 hicc5=53 sample=*tri tune=-1200 pitch_cc11=$SINGLEBEND // 16' Triangle
+<region> locc5=54 hicc5=59 sample=*tri pitch_cc11=$SINGLEBEND // 8' Triangle
+<region> locc5=60 hicc5=65 sample=*tri tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc5=66 hicc5=71 sample=*tri tune=1200 pitch_cc11=$SINGLEBEND // 4' Triangle
+<region> locc5=72 hicc5=77 sample=*saw tune=-1200 pitch_cc11=$SINGLEBEND // 16' Sawtooth
+<region> locc5=78 hicc5=83 sample=*saw pitch_cc11=$SINGLEBEND // 8' Sawtooth
+<region> locc5=84 hicc5=89 sample=*saw tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc5=90 hicc5=95 sample=*saw tune=1200 pitch_cc11=$SINGLEBEND // 4' Sawtooth
+<region> locc5=96 hicc5=101 sample=*square tune=-1200 pitch_cc11=$SINGLEBEND // 16' Square
+<region> locc5=102 hicc5=107 sample=*square pitch_cc11=$SINGLEBEND // 8' Square
+<region> locc5=108 hicc5=113 sample=*square tune=701.6 pitch_cc11=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc5=114 hicc5=119 sample=*square tune=1200 pitch_cc11=$SINGLEBEND // 4' Square
+<region> locc5=120 hicc5=125 sample=*noise // Noise
+
+// Oscillator 5 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+<master> hicc48=0 xfout_lovel=$XFOUT_LO xfout_hivel=$XFOUT_HI pan_cc48=$XF_PAN // Lo-sensitive crossfade
+// Oscillator 5 core
+volume=-$MAX_AMP volume_cc43=$MAX_AMP
+ampeg_attackcc18=$MAX_ATK ampeg_decaycc24=$MAX_DEC ampeg_sustaincc30=$MAX_SUS ampeg_releasecc36=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc42=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc6=0 hicc6=5 sample=*sine tune=-1200 pitch_cc12=$SINGLEBEND // 16' Sine
+<region> locc6=6 hicc6=11 sample=*sine pitch_cc12=$SINGLEBEND // 8' Sine
+<region> locc6=12 hicc6=17 sample=*sine tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc6=18 hicc6=23 sample=*sine tune=1200 pitch_cc12=$SINGLEBEND // 4' Sine
+<region> locc6=24 hicc6=29 sample=*sine tune=1586 pitch_cc12=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc6=30 hicc6=35 sample=*sine tune=1901.6 pitch_cc12=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc6=36 hicc6=41 sample=*sine tune=2159 pitch_cc12=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc6=72 hicc6=75 sample=*sine tune=2400 pitch_cc12=$SINGLEBEND // 2' Sine
+<region> locc6=48 hicc6=53 sample=*tri tune=-1200 pitch_cc12=$SINGLEBEND // 16' Triangle
+<region> locc6=54 hicc6=59 sample=*tri pitch_cc12=$SINGLEBEND // 8' Triangle
+<region> locc6=60 hicc6=65 sample=*tri tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc6=66 hicc6=71 sample=*tri tune=1200 pitch_cc12=$SINGLEBEND // 4' Triangle
+<region> locc6=72 hicc6=77 sample=*saw tune=-1200 pitch_cc12=$SINGLEBEND // 16' Sawtooth
+<region> locc6=78 hicc6=83 sample=*saw pitch_cc12=$SINGLEBEND // 8' Sawtooth
+<region> locc6=84 hicc6=89 sample=*saw tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc6=90 hicc6=95 sample=*saw tune=1200 pitch_cc12=$SINGLEBEND // 4' Sawtooth
+<region> locc6=96 hicc6=101 sample=*square tune=-1200 pitch_cc12=$SINGLEBEND // 16' Square
+<region> locc6=102 hicc6=107 sample=*square pitch_cc12=$SINGLEBEND // 8' Square
+<region> locc6=108 hicc6=113 sample=*square tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc6=114 hicc6=119 sample=*square tune=1200 pitch_cc12=$SINGLEBEND // 4' Square
+<region> locc6=120 hicc6=125 sample=*noise // Noise
+
+<master> locc48=1 hicc48=126 pan_cc48=100 // No crossfade
+// Oscillator 5 core
+volume=-$MAX_AMP volume_cc43=$MAX_AMP
+ampeg_attackcc18=$MAX_ATK ampeg_decaycc24=$MAX_DEC ampeg_sustaincc30=$MAX_SUS ampeg_releasecc36=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc42=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc6=0 hicc6=5 sample=*sine tune=-1200 pitch_cc12=$SINGLEBEND // 16' Sine
+<region> locc6=6 hicc6=11 sample=*sine pitch_cc12=$SINGLEBEND // 8' Sine
+<region> locc6=12 hicc6=17 sample=*sine tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc6=18 hicc6=23 sample=*sine tune=1200 pitch_cc12=$SINGLEBEND // 4' Sine
+<region> locc6=24 hicc6=29 sample=*sine tune=1586 pitch_cc12=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc6=30 hicc6=35 sample=*sine tune=1901.6 pitch_cc12=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc6=36 hicc6=41 sample=*sine tune=2159 pitch_cc12=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc6=72 hicc6=75 sample=*sine tune=2400 pitch_cc12=$SINGLEBEND // 2' Sine
+<region> locc6=48 hicc6=53 sample=*tri tune=-1200 pitch_cc12=$SINGLEBEND // 16' Triangle
+<region> locc6=54 hicc6=59 sample=*tri pitch_cc12=$SINGLEBEND // 8' Triangle
+<region> locc6=60 hicc6=65 sample=*tri tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc6=66 hicc6=71 sample=*tri tune=1200 pitch_cc12=$SINGLEBEND // 4' Triangle
+<region> locc6=72 hicc6=77 sample=*saw tune=-1200 pitch_cc12=$SINGLEBEND // 16' Sawtooth
+<region> locc6=78 hicc6=83 sample=*saw pitch_cc12=$SINGLEBEND // 8' Sawtooth
+<region> locc6=84 hicc6=89 sample=*saw tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc6=90 hicc6=95 sample=*saw tune=1200 pitch_cc12=$SINGLEBEND // 4' Sawtooth
+<region> locc6=96 hicc6=101 sample=*square tune=-1200 pitch_cc12=$SINGLEBEND // 16' Square
+<region> locc6=102 hicc6=107 sample=*square pitch_cc12=$SINGLEBEND // 8' Square
+<region> locc6=108 hicc6=113 sample=*square tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc6=114 hicc6=119 sample=*square tune=1200 pitch_cc12=$SINGLEBEND // 4' Square
+<region> locc6=120 hicc6=125 sample=*noise // Noise
+
+<master> locc48=127 xfin_lovel=$XFIN_LO xfin_hivel=$XFIN_HI pan_cc48=$XF_PAN // Hi-sensitive crossfade
+// Oscillator 5 core
+volume=-$MAX_AMP volume_cc43=$MAX_AMP
+ampeg_attackcc18=$MAX_ATK ampeg_decaycc24=$MAX_DEC ampeg_sustaincc30=$MAX_SUS ampeg_releasecc36=$MAX_REL
+fil_type=lpf_1p cutoff=20 cutoff_cc42=23980 fil_keytrack=$LPFKEY_TRACK fil_keycenter=$LPFKEY_CENTER
+
+<region> locc6=0 hicc6=5 sample=*sine tune=-1200 pitch_cc12=$SINGLEBEND // 16' Sine
+<region> locc6=6 hicc6=11 sample=*sine pitch_cc12=$SINGLEBEND // 8' Sine
+<region> locc6=12 hicc6=17 sample=*sine tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Sine
+<region> locc6=18 hicc6=23 sample=*sine tune=1200 pitch_cc12=$SINGLEBEND // 4' Sine
+<region> locc6=24 hicc6=29 sample=*sine tune=1586 pitch_cc12=$SINGLEBEND // 3¹⁄₅' Sine
+<region> locc6=30 hicc6=35 sample=*sine tune=1901.6 pitch_cc12=$SINGLEBEND // 2²⁄₃' Sine
+<region> locc6=36 hicc6=41 sample=*sine tune=2159 pitch_cc12=$SINGLEBEND // 2²⁄₇' Sine
+<region> locc6=72 hicc6=75 sample=*sine tune=2400 pitch_cc12=$SINGLEBEND // 2' Sine
+<region> locc6=48 hicc6=53 sample=*tri tune=-1200 pitch_cc12=$SINGLEBEND // 16' Triangle
+<region> locc6=54 hicc6=59 sample=*tri pitch_cc12=$SINGLEBEND // 8' Triangle
+<region> locc6=60 hicc6=65 sample=*tri tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Triangle
+<region> locc6=66 hicc6=71 sample=*tri tune=1200 pitch_cc12=$SINGLEBEND // 4' Triangle
+<region> locc6=72 hicc6=77 sample=*saw tune=-1200 pitch_cc12=$SINGLEBEND // 16' Sawtooth
+<region> locc6=78 hicc6=83 sample=*saw pitch_cc12=$SINGLEBEND // 8' Sawtooth
+<region> locc6=84 hicc6=89 sample=*saw tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Sawtooth
+<region> locc6=90 hicc6=95 sample=*saw tune=1200 pitch_cc12=$SINGLEBEND // 4' Sawtooth
+<region> locc6=96 hicc6=101 sample=*square tune=-1200 pitch_cc12=$SINGLEBEND // 16' Square
+<region> locc6=102 hicc6=107 sample=*square pitch_cc12=$SINGLEBEND // 8' Square
+<region> locc6=108 hicc6=113 sample=*square tune=701.6 pitch_cc12=$SINGLEBEND // 5¹⁄₃' Square
+<region> locc6=114 hicc6=119 sample=*square tune=1200 pitch_cc12=$SINGLEBEND // 4' Square
+<region> locc6=120 hicc6=125 sample=*noise // Noise
